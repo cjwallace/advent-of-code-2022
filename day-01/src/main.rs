@@ -19,8 +19,8 @@ fn calories(path: &str, n: usize) -> u32 {
 fn main() {
     let input = "day-01/data/input.txt";
 
-    println!("Part one: {}", calories(&input, 1));
-    println!("Part two: {}", calories(&input, 3));
+    println!("Part one: {}", calories(input, 1));
+    println!("Part two: {}", calories(input, 3));
 }
 
 #[cfg(test)]
