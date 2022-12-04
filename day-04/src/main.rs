@@ -1,35 +1,51 @@
 use std::fs;
+use std::num::ParseIntError;
+use std::str::FromStr;
 
-fn condition_one(fl: u32, fu: u32, sl: u32, su: u32) -> bool {
-    ((fl <= sl) & (fu >= su)) | ((fl >= sl) & (fu <= su))
+type Section = u32;
+
+#[derive(Clone, Copy)]
+struct Elf {
+    lower: Section,
+    upper: Section,
 }
 
-fn condition_two(fl: u32, fu: u32, sl: u32, su: u32) -> bool {
-    ((fu >= sl) & (su >= fl)) | ((su >= fl) & (fu >= sl))
+impl FromStr for Elf {
+    type Err = ParseIntError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let (lower, upper) = s.split_once('-').unwrap();
+        Ok(Elf {
+            lower: lower.parse::<u32>()?,
+            upper: upper.parse::<u32>()?,
+        })
+    }
 }
 
-fn parse_sections(elf: &str) -> (u32, u32) {
-    let (lower, upper) = elf.split_once('-').unwrap();
-    (lower.parse::<u32>().unwrap(), upper.parse::<u32>().unwrap())
-}
-
-fn solution(path: &str, condition: fn(u32, u32, u32, u32) -> bool) -> usize {
+fn solution(path: &str, condition: fn(Elf, Elf) -> bool) -> usize {
     fs::read_to_string(path)
         .expect("That is not a valid input file")
         .split('\n')
         .filter(|line| {
-            let (first_elf, second_elf) = line.split_once(",").unwrap();
-            let (first_lower, first_upper) = parse_sections(first_elf);
-            let (second_lower, second_upper) = parse_sections(second_elf);
-            condition(first_lower, first_upper, second_lower, second_upper)
+            let (first_elf, second_elf) = line.split_once(',').unwrap();
+            let snowball = Elf::from_str(first_elf).unwrap();
+            let peppermint = Elf::from_str(second_elf).unwrap();
+            condition(snowball, peppermint) | condition(peppermint, snowball)
         })
         .count()
 }
 
+fn contains(snowball: Elf, peppermint: Elf) -> bool {
+    (snowball.lower <= peppermint.lower) & (snowball.upper >= peppermint.upper)
+}
+
+fn overlaps(snowball: Elf, peppermint: Elf) -> bool {
+    (snowball.upper >= peppermint.lower) & (peppermint.upper >= snowball.lower)
+}
 fn main() {
     let path = "day-04/data/input.txt";
-    println!("Part one: {}", solution(path, condition_one));
-    println!("Part two: {}", solution(path, condition_two));
+    println!("Part one: {}", solution(path, contains));
+    println!("Part two: {}", solution(path, overlaps));
 }
 
 #[cfg(test)]
@@ -39,12 +55,12 @@ mod test {
     #[test]
     fn test_part_one() {
         let path = "data/test.txt";
-        assert_eq!(solution(path, condition_one), 2);
+        assert_eq!(solution(path, contains), 2);
     }
 
     #[test]
     fn test_part_two() {
         let path = "data/test.txt";
-        assert_eq!(solution(path, condition_two), 4);
+        assert_eq!(solution(path, overlaps), 4);
     }
 }
