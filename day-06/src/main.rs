@@ -1,13 +1,17 @@
 use std::{collections::HashSet, fs};
 
+fn is_marker(window: &[char]) -> bool {
+    HashSet::<char>::from_iter(window.to_owned()).len() == window.len()
+}
+
 fn start_of_packet(packet: &String, marker_length: usize) -> usize {
-    let chars: Vec<char> = packet.chars().collect();
-    for (i, window) in chars.windows(marker_length).enumerate() {
-        if HashSet::<char>::from_iter(window.to_owned()).len() == marker_length {
-            return marker_length + i;
-        }
-    }
-    return 0;
+    packet
+        .chars()
+        .collect::<Vec<char>>()
+        .windows(marker_length)
+        .position(is_marker)
+        .unwrap()
+        + marker_length
 }
 
 fn main() {
@@ -57,11 +61,11 @@ mod test {
             23
         );
         assert_eq!(
-            start_of_packet(&"nznrnfrfntjfmvfwmzdfjlvtqnbhcprsg".to_string(), 29),
+            start_of_packet(&"nznrnfrfntjfmvfwmzdfjlvtqnbhcprsg".to_string(), 14),
             29
         );
         assert_eq!(
-            start_of_packet(&"zcfzfwzzqfrljwzlrfnpqdbhtmscgvjw".to_string(), 26),
+            start_of_packet(&"zcfzfwzzqfrljwzlrfnpqdbhtmscgvjw".to_string(), 14),
             26
         );
     }
