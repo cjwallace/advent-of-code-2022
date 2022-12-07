@@ -1,88 +1,56 @@
-use nom::{
-    branch::alt,
-    bytes::complete::tag,
-    character::complete::{alpha1, digit1},
-    combinator::map,
-    sequence::{preceded, separated_pair},
-    IResult,
-};
+use std::collections::HashMap;
 use std::fs;
 
-type Directory = String;
+const MAX_DIR_SIZE: u32 = 100000;
+const TOTAL_SPACE: u32 = 70000000;
+const REQUIRED_UNUSED_SPACE: u32 = 30000000;
 
-#[derive(Debug)]
-struct File {
-    name: String,
-    size: usize,
-}
+fn solution(path: &str) -> (u32, u32) {
+    let input = fs::read_to_string(path).expect("That is not a valid input file");
+    let mut stack = vec![String::from("/")];
+    let mut sizes = HashMap::<String, u32>::new();
 
-#[derive(Debug)]
-enum Command {
-    CD(Directory),
-    LS,
-}
+    for line in input.lines() {
+        let words: Vec<&str> = line.split_whitespace().collect();
+        if words[0] == "$" && words[1] == "cd" {
+            // match to cd commands
+            match words[2] {
+                "/" => {
+                    stack.clear();
+                    stack.push(String::from("/"))
+                }
+                ".." => {
+                    stack.pop();
+                }
+                dir => stack.push(dir.to_string()),
+            }
+        } else if words[0].parse::<u32>().is_ok() {
+            // matched to files
+            let filesize = words[0].parse::<u32>().unwrap();
+            for i in 0..stack.len() + 1 {
+                let key = stack[0..i].join("/");
+                *sizes.entry(key).or_insert(0) += filesize;
+            }
+        }
+    }
 
-#[derive(Debug)]
-enum FS {
-    Directory(Directory),
-    File(File),
-    Command(Command),
-}
+    let part_one = sizes.values().filter(|&&size| size < MAX_DIR_SIZE).sum();
 
-fn directory_parser(input: &str) -> IResult<&str, FS> {
-    let parser = preceded(tag("dir "), alpha1);
-    map(parser, |name: &str| FS::Directory(name.to_string()))(input)
-}
-
-fn ls_parser(input: &str) -> IResult<&str, FS> {
-    let parser = tag("$ ls");
-    map(parser, |_: &str| FS::Command(Command::LS))(input)
-}
-
-fn cd_parser(input: &str) -> IResult<&str, FS> {
-    let dir_parser = alt((alpha1, tag("/"), tag("..")));
-    let parser = preceded(tag("$ cd "), dir_parser);
-    map(parser, |dir: &str| {
-        FS::Command(Command::CD(dir.to_string()))
-    })(input)
-}
-
-fn command_parser(input: &str) -> IResult<&str, FS> {
-    alt((cd_parser, ls_parser))(input)
-}
-
-fn file_parser(input: &str) -> IResult<&str, FS> {
-    let parser = separated_pair(digit1, tag(" "), alpha1);
-    map(parser, |(size, name): (&str, &str)| {
-        FS::File(File {
-            size: size.parse::<usize>().unwrap(),
-            name: name.to_string(),
-        })
-    })(input)
-}
-
-fn parser(input: &str) -> IResult<&str, FS> {
-    alt((command_parser, file_parser, directory_parser))(input)
-}
-
-fn parse(path: &str) -> Vec<FS> {
-    fs::read_to_string(path)
-        .expect("That is not a valid input file")
-        .split('\n')
-        .map(|line| parser(line).unwrap().1)
-        .collect::<Vec<FS>>()
-}
-
-fn part_one(path: &str) -> u32 {
-    let commands = parse(path);
-    println!("{:?}", commands);
-    0
+    let unused_space = TOTAL_SPACE - sizes["/"];
+    let must_delete = REQUIRED_UNUSED_SPACE - unused_space;
+    let part_two = sizes
+        .values()
+        .filter(|&&size| size > must_delete)
+        .min()
+        .unwrap()
+        .clone();
+    (part_one, part_two)
 }
 
 fn main() {
     let input = "day-07/data/input.txt";
-
-    println!("Part one: {}", part_one(input));
+    println!("Part one: {}", solution(input).0);
+    println!("Part two: {}", solution(input).1);
 }
 
 #[cfg(test)]
@@ -92,6 +60,12 @@ mod test {
     #[test]
     fn test_part_one() {
         let test = "data/test.txt";
-        assert_eq!(part_one(test), 95437);
+        assert_eq!(solution(test).0, 95437);
+    }
+
+    #[test]
+    fn test_part_two() {
+        let test = "data/test.txt";
+        assert_eq!(solution(test).1, 24933642);
     }
 }
