@@ -24,9 +24,8 @@ fn solution(path: &str) -> (u32, u32) {
                 }
                 dir => stack.push(dir.to_string()),
             }
-        } else if words[0].parse::<u32>().is_ok() {
+        } else if let Ok(filesize) = words[0].parse::<u32>() {
             // matched to files
-            let filesize = words[0].parse::<u32>().unwrap();
             for i in 0..stack.len() + 1 {
                 let key = stack[0..i].join("/");
                 *sizes.entry(key).or_insert(0) += filesize;
