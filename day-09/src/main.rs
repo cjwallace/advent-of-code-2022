@@ -1,17 +1,13 @@
 use itertools::Itertools;
 use std::fs::read_to_string;
 
-#[derive(Clone, Debug, Hash, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Hash, Eq, PartialEq)]
 struct Coord {
     x: i32,
     y: i32,
 }
 
-#[derive(Debug)]
-struct Rope {
-    head: Coord,
-    tail: Coord,
-}
+type Rope = Vec<Coord>;
 
 fn within_one(a: i32, b: i32) -> bool {
     a - 1 <= b && b <= a + 1
@@ -71,13 +67,21 @@ fn tail_move(tail: &Coord, head: &Coord) -> Coord {
     }
 }
 
-fn part_one(path: &str) -> i32 {
+fn new_rope(previous_rope: &Rope, new_head: Coord) -> Rope {
+    previous_rope
+        .iter()
+        .skip(1)
+        .fold(vec![new_head], |mut acc, knot| {
+            let new_knot = tail_move(&knot, &acc.last().unwrap());
+            acc.push(new_knot);
+            acc
+        })
+}
+
+fn solution(path: &str, length_of_rope: usize) -> i32 {
     let input = read_to_string(path).expect("That is not a valid input");
 
-    let mut coords = vec![Rope {
-        head: Coord { x: 0, y: 0 },
-        tail: Coord { x: 0, y: 0 },
-    }];
+    let mut coords = vec![vec![Coord { x: 0, y: 0 }; length_of_rope]];
 
     for line in input.lines() {
         let (direction, steps_str) = line.split_once(' ').unwrap();
@@ -88,73 +92,61 @@ fn part_one(path: &str) -> i32 {
                 for _ in 0..steps {
                     let prev = coords.last().unwrap();
                     let new_head = Coord {
-                        x: prev.head.x - 1,
-                        y: prev.head.y,
+                        x: prev[0].x - 1,
+                        y: prev[0].y,
                     };
-                    let new_tail = tail_move(&prev.tail, &new_head);
-                    coords.push(Rope {
-                        head: new_head,
-                        tail: new_tail,
-                    });
+                    let new_rope = new_rope(&prev, new_head);
+                    coords.push(new_rope);
                 }
             }
             "R" => {
                 for _ in 0..steps {
                     let prev = coords.last().unwrap();
                     let new_head = Coord {
-                        x: prev.head.x + 1,
-                        y: prev.head.y,
+                        x: prev[0].x + 1,
+                        y: prev[0].y,
                     };
-                    let new_tail = tail_move(&prev.tail, &new_head);
-                    coords.push(Rope {
-                        head: new_head,
-                        tail: new_tail,
-                    });
+                    let new_rope = new_rope(&prev, new_head);
+                    coords.push(new_rope);
                 }
             }
             "U" => {
                 for _ in 0..steps {
                     let prev = coords.last().unwrap();
                     let new_head = Coord {
-                        x: prev.head.x,
-                        y: prev.head.y + 1,
+                        x: prev[0].x,
+                        y: prev[0].y + 1,
                     };
-                    let new_tail = tail_move(&prev.tail, &new_head);
-                    coords.push(Rope {
-                        head: new_head,
-                        tail: new_tail,
-                    });
+                    let new_rope = new_rope(&prev, new_head);
+                    coords.push(new_rope);
                 }
             }
             "D" => {
                 for _ in 0..steps {
                     let prev = coords.last().unwrap();
                     let new_head = Coord {
-                        x: prev.head.x,
-                        y: prev.head.y - 1,
+                        x: prev[0].x,
+                        y: prev[0].y - 1,
                     };
-                    let new_tail = tail_move(&prev.tail, &new_head);
-                    coords.push(Rope {
-                        head: new_head,
-                        tail: new_tail,
-                    });
+                    let new_rope = new_rope(&prev, new_head);
+                    coords.push(new_rope);
                 }
             }
             _ => unreachable!("Oh no."),
         }
     }
-    println!("{:?}", coords);
 
     coords
         .iter()
-        .map(|coord| coord.tail.clone())
+        .map(|coord| coord.last().clone())
         .unique()
         .count() as i32
 }
 
 fn main() {
     let path = "day-09/data/input.txt";
-    println!("Part one: {}", part_one(path));
+    println!("Part one: {}", solution(path, 2));
+    println!("Part two: {}", solution(path, 10));
 }
 
 #[cfg(test)]
@@ -164,6 +156,14 @@ mod test {
     #[test]
     fn test_part_one() {
         let path = "data/test.txt";
-        assert_eq!(part_one(path), 13)
+        assert_eq!(solution(path, 2), 13);
+    }
+
+    #[test]
+    fn test_part_two() {
+        let path_one = "data/test.txt";
+        assert_eq!(solution(path_one, 10), 1);
+        let path_two = "data/test_part_two.txt";
+        assert_eq!(solution(path_two, 10), 36)
     }
 }
