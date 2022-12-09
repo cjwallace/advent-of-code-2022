@@ -1,70 +1,42 @@
 use itertools::Itertools;
 use std::fs::read_to_string;
+use std::num::ParseIntError;
+use std::str::FromStr;
 
-#[derive(Clone, Copy, Debug, Hash, Eq, PartialEq)]
-struct Coord {
-    x: i32,
-    y: i32,
-}
-
+type Coord = (i32, i32);
 type Rope = Vec<Coord>;
 
-fn within_one(a: i32, b: i32) -> bool {
-    a - 1 <= b && b <= a + 1
+struct Move {
+    direction: Coord,
+    steps: usize,
 }
 
-fn tail_move(tail: &Coord, head: &Coord) -> Coord {
-    if within_one(tail.x, head.x) && within_one(tail.y, head.y) {
-        return Coord {
-            x: tail.x,
-            y: tail.y,
-        };
-    } else if (tail.x == head.x) && (head.y == tail.y + 2) {
-        return Coord {
-            x: tail.x,
-            y: tail.y + 1,
-        };
-    } else if (tail.x == head.x) && (head.y == tail.y - 2) {
-        return Coord {
-            x: tail.x,
-            y: tail.y - 1,
-        };
-    } else if (tail.y == head.y) && (head.x == tail.x + 2) {
-        return Coord {
-            x: tail.x + 1,
-            y: tail.y,
-        };
-    } else if (tail.y == head.y) && (head.x == tail.x - 2) {
-        return Coord {
-            x: tail.x - 1,
-            y: tail.y,
-        };
-    } else if (head.x > tail.x) && (head.y > tail.y) {
-        return Coord {
-            x: tail.x + 1,
-            y: tail.y + 1,
-        };
-    } else if (head.x > tail.x) && (head.y < tail.y) {
-        return Coord {
-            x: tail.x + 1,
-            y: tail.y - 1,
-        };
-    } else if (head.x < tail.x) && (head.y > tail.y) {
-        return Coord {
-            x: tail.x - 1,
-            y: tail.y + 1,
-        };
-    } else if (head.x < tail.x) && (head.y < tail.y) {
-        return Coord {
-            x: tail.x - 1,
-            y: tail.y - 1,
-        };
-    } else {
-        return Coord {
-            x: tail.x,
-            y: tail.y,
-        };
+const L: Coord = (-1, 0);
+const R: Coord = (1, 0);
+const U: Coord = (0, 1);
+const D: Coord = (0, -1);
+
+fn positions_visited(path: &str, length_of_rope: usize) -> usize {
+    let input = read_to_string(path).expect("That is not a valid input");
+
+    let mut rope_coords = vec![vec![(0, 0); length_of_rope]];
+
+    for line in input.lines() {
+        let m = Move::from_str(line).unwrap();
+        rope_coords = update_coords(rope_coords, m);
     }
+
+    count_tail_positions(rope_coords)
+}
+
+fn update_coords(mut ropes: Vec<Rope>, m: Move) -> Vec<Rope> {
+    for _ in 0..m.steps {
+        let prev = ropes.last().unwrap();
+        let new_head = move_knot(prev[0], m.direction);
+        let new_rope = new_rope(&prev, new_head);
+        ropes.push(new_rope)
+    }
+    ropes
 }
 
 fn new_rope(previous_rope: &Rope, new_head: Coord) -> Rope {
@@ -72,81 +44,57 @@ fn new_rope(previous_rope: &Rope, new_head: Coord) -> Rope {
         .iter()
         .skip(1)
         .fold(vec![new_head], |mut acc, knot| {
-            let new_knot = tail_move(&knot, &acc.last().unwrap());
+            let new_knot = move_tail(&knot, &acc.last().unwrap());
             acc.push(new_knot);
             acc
         })
 }
 
-fn solution(path: &str, length_of_rope: usize) -> i32 {
-    let input = read_to_string(path).expect("That is not a valid input");
+fn move_knot(position: Coord, change: Coord) -> Coord {
+    (position.0 + change.0, position.1 + change.1)
+}
 
-    let mut coords = vec![vec![Coord { x: 0, y: 0 }; length_of_rope]];
-
-    for line in input.lines() {
-        let (direction, steps_str) = line.split_once(' ').unwrap();
-        let steps = steps_str.parse::<i32>().unwrap();
-
-        match direction {
-            "L" => {
-                for _ in 0..steps {
-                    let prev = coords.last().unwrap();
-                    let new_head = Coord {
-                        x: prev[0].x - 1,
-                        y: prev[0].y,
-                    };
-                    let new_rope = new_rope(&prev, new_head);
-                    coords.push(new_rope);
-                }
-            }
-            "R" => {
-                for _ in 0..steps {
-                    let prev = coords.last().unwrap();
-                    let new_head = Coord {
-                        x: prev[0].x + 1,
-                        y: prev[0].y,
-                    };
-                    let new_rope = new_rope(&prev, new_head);
-                    coords.push(new_rope);
-                }
-            }
-            "U" => {
-                for _ in 0..steps {
-                    let prev = coords.last().unwrap();
-                    let new_head = Coord {
-                        x: prev[0].x,
-                        y: prev[0].y + 1,
-                    };
-                    let new_rope = new_rope(&prev, new_head);
-                    coords.push(new_rope);
-                }
-            }
-            "D" => {
-                for _ in 0..steps {
-                    let prev = coords.last().unwrap();
-                    let new_head = Coord {
-                        x: prev[0].x,
-                        y: prev[0].y - 1,
-                    };
-                    let new_rope = new_rope(&prev, new_head);
-                    coords.push(new_rope);
-                }
-            }
-            _ => unreachable!("Oh no."),
-        }
+fn move_tail(tail: &Coord, head: &Coord) -> Coord {
+    let (x, y) = (head.0 - tail.0, head.1 - tail.1);
+    if x.abs() <= 1 && y.abs() <= 1 {
+        *tail
+    } else {
+        move_knot(*tail, (x.signum(), y.signum()))
     }
+}
 
-    coords
+fn count_tail_positions(ropes: Vec<Rope>) -> usize {
+    ropes
         .iter()
         .map(|coord| coord.last().clone())
         .unique()
-        .count() as i32
+        .count()
+}
+
+impl FromStr for Move {
+    type Err = ParseIntError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let (direction_str, steps_str) = s.split_once(' ').unwrap();
+
+        let direction = match direction_str {
+            "L" => L,
+            "R" => R,
+            "U" => U,
+            "D" => D,
+            _ => unreachable!("Oh no."),
+        };
+
+        let steps = usize::from_str_radix(steps_str, 10)?;
+
+        Ok(Move { direction, steps })
+    }
 }
 
 fn main() {
     let path = "day-09/data/input.txt";
-    println!("Part one: {}", solution(path, 2));
-    println!("Part two: {}", solution(path, 10));
+    println!("Part one: {}", positions_visited(path, 2));
+    println!("Part two: {}", positions_visited(path, 10));
 }
 
 #[cfg(test)]
@@ -156,14 +104,14 @@ mod test {
     #[test]
     fn test_part_one() {
         let path = "data/test.txt";
-        assert_eq!(solution(path, 2), 13);
+        assert_eq!(positions_visited(path, 2), 13);
     }
 
     #[test]
     fn test_part_two() {
         let path_one = "data/test.txt";
-        assert_eq!(solution(path_one, 10), 1);
+        assert_eq!(positions_visited(path_one, 10), 1);
         let path_two = "data/test_part_two.txt";
-        assert_eq!(solution(path_two, 10), 36)
+        assert_eq!(positions_visited(path_two, 10), 36)
     }
 }
